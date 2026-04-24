@@ -449,6 +449,8 @@ export default class Translate {
 
 	async AI(text = [], source = this.Source, target = this.Target, api = this.API) {
 		text = Array.isArray(text) ? text : [text];
+		if (!api?.URL) return text.map(() => `翻译失败, vendor: AI (请在BoxJS中配置AI API地址和Token)`);
+		if (!api?.Token) return text.map(() => `翻译失败, vendor: AI (请在BoxJS中配置AI API Token)`);
 		const dataParseReg = /-\s*id:\s\d+\s*text:\s([^\n]*)/g;
 		source = this.#LanguagesCode.Google[source] ?? this.#LanguagesCode.Google[source?.split?.(/[-_]/)?.[0]];
 		target = this.#LanguagesCode.Google[target] ?? this.#LanguagesCode.Google[target?.split?.(/[-_]/)?.[0]];

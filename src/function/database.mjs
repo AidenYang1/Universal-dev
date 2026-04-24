@@ -473,6 +473,12 @@ export default {
 				Endpoint: "",
 				Auth: "",
 			},
+			AI: {
+				URL: "https://api.openai.com/v1/chat/completions",
+				Model: "gpt-4o-mini",
+				Token: "",
+				Prompt: "",
+			},
 			URL: "",
 			NeteaseMusic: {
 				PhoneNumber: "",
