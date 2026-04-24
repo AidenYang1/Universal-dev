@@ -416,6 +416,68 @@ export default class Translate {
 			.catch(error => Promise.reject(Console.error(error)));
 	}
 
+	async OpenAI(text = [], source = this.Source, target = this.Target, api = this.API) {
+		text = Array.isArray(text) ? text : [text];
+		const LanguageNames = {
+			AUTO: "the original language",
+			ZH: "Chinese (Simplified)", "ZH-HANS": "Chinese (Simplified)", "ZH-HK": "Chinese (Traditional, Hong Kong)", "ZH-HANT": "Chinese (Traditional)",
+			EN: "English", "EN-US": "English (US)", "EN-GB": "English (UK)", "EN-US SDH": "English (US)",
+			JA: "Japanese", KO: "Korean", DE: "German", FR: "French", "FR-CA": "French (Canada)",
+			ES: "Spanish", "ES-419": "Spanish (Latin America)", "ES-ES": "Spanish (Spain)",
+			IT: "Italian", PT: "Portuguese", "PT-BR": "Portuguese (Brazil)", "PT-PT": "Portuguese (Portugal)",
+			RU: "Russian", AR: "Arabic", TR: "Turkish", PL: "Polish",
+			NL: "Dutch", SV: "Swedish", DA: "Danish", FI: "Finnish",
+			NO: "Norwegian", CS: "Czech", HU: "Hungarian", RO: "Romanian",
+			BG: "Bulgarian", UK: "Ukrainian", VI: "Vietnamese", TH: "Thai",
+			ID: "Indonesian", EL: "Greek", SK: "Slovak", SL: "Slovenian",
+			LT: "Lithuanian", LV: "Latvian", ET: "Estonian", IS: "Icelandic",
+			AF: "Afrikaans", AM: "Amharic", AZ: "Azerbaijani", BE: "Belarusian",
+			BN: "Bengali", KM: "Khmer", PA: "Punjabi", UR: "Urdu",
+		};
+		const srcLang = LanguageNames[source] ?? source;
+		const tgtLang = LanguageNames[target] ?? target;
+		const endpoint = api?.BaseURL ?? "https://api.openai.com/v1/chat/completions";
+		const model = api?.Model ?? "gpt-4o-mini";
+		const auth = api?.Auth ?? api?.Token;
+		const numbered = text.map((t, i) => `${i + 1}. ${t}`).join("\n");
+		const systemPrompt =
+			source === "AUTO"
+				? `You are a professional subtitle translator. Translate the subtitles to ${tgtLang}. Input: numbered subtitle lines. Output: ONLY the translated numbered lines in the same format. No explanations.`
+				: `You are a professional subtitle translator. Translate the subtitles from ${srcLang} to ${tgtLang}. Input: numbered subtitle lines. Output: ONLY the translated numbered lines in the same format. No explanations.`;
+		const request = {
+			url: endpoint,
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${auth}`,
+				"User-Agent": "DualSubs",
+			},
+			body: JSON.stringify({
+				model: model,
+				messages: [
+					{ role: "system", content: systemPrompt },
+					{ role: "user", content: numbered },
+				],
+				temperature: 0.1,
+			}),
+		};
+		return await fetch(request)
+			.then(response => {
+				const body = JSON.parse(response.body);
+				if (body?.error) return Promise.reject(new Error(body.error?.message ?? JSON.stringify(body.error)));
+				const content = body?.choices?.[0]?.message?.content ?? "";
+				const result = new Array(text.length).fill(`翻译失败, vendor: OpenAI`);
+				content.split("\n").forEach(line => {
+					const match = line.match(/^(\d+)\.\s*([\s\S]*)/);
+					if (match) {
+						const idx = parseInt(match[1], 10) - 1;
+						if (idx >= 0 && idx < text.length) result[idx] = match[2].trim();
+					}
+				});
+				return result;
+			})
+			.catch(error => Promise.reject(error));
+	}
+
 	async YoudaoAI(text = [], source = this.Source, target = this.Target, api = this.API) {
 		text = Array.isArray(text) ? text : [text];
 		source = this.#LanguagesCode.Youdao[source] ?? this.#LanguagesCode.Youdao[source?.split?.(/[-_]/)?.[0]];
