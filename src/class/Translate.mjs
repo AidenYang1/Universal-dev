@@ -442,7 +442,37 @@ export default class Translate {
 		return await fetch(request)
 			.then(response => {
 				const body = JSON.parse(response.body);
-				return body?.data ?? `翻译失败, vendor: ${"DeepL"}`;
+				return body?.data ?? `翻译失败, vendor: ${"YoudaoAI"}`;
+			})
+			.catch(error => Promise.reject(error));
+	}
+
+	async AI(text = [], source = this.Source, target = this.Target, api = this.API) {
+		text = Array.isArray(text) ? text : [text];
+		const dataParseReg = /-\s*id:\s\d+\s*text:\s([^\n]*)/g;
+		source = this.#LanguagesCode.Google[source] ?? this.#LanguagesCode.Google[source?.split?.(/[-_]/)?.[0]];
+		target = this.#LanguagesCode.Google[target] ?? this.#LanguagesCode.Google[target?.split?.(/[-_]/)?.[0]];
+		const request = {};
+		request.url = api.URL;
+		request.headers = {
+			"User-Agent": "DualSubs",
+			"Content-Type": "application/json; charset=utf-8",
+			...(api.Token && { Authorization: `Bearer ${api.Token}` }),
+		};
+		const yamlPrompt = text.map((t, i) => `\n- id: ${i + 1}\n  text: ${t}\n`).join("");
+		const prompt = `${api.Prompt ?? ""}\n You will be given a YAML formatted video/episode subtitles containing entries with "id" and "text" fields. Here is the input:\n\n<yaml>${yamlPrompt}</yaml>\n\nFor each entry in the YAML, translate the contents of the "text" field into language: ${target}, Write the translation back into the "text" field for that entry. Please translate the complete sentences first, and then breaking it down into multiple fragments based on the content and the id length in a freer, more conversational style.\n\nHere is an example of the expected format:\n\n<example>\nInput:\n - id: 1\n text: In China, if you want\n - id: 2\n text: noodles\n - id: 3\n text: come to Shaanxi!\nOutput:\n - id: 1\n text: 在中国，如果你想\n - id: 2\n text: 吃面\n - id: 3\n text: 来陕西！\n</example>\n\nPlease return the translated YAML directly without wrapping <yaml> tag or include any additional information.`;
+		request.body = JSON.stringify({
+			model: api.Model,
+			temperature: 1,
+			stream: false,
+			messages: [{ role: "user", content: prompt }],
+		});
+		return await fetch(request)
+			.then(response => {
+				const body = JSON.parse(response.body);
+				const content = body?.choices?.[0]?.message?.content ?? "";
+				const data = [...content.matchAll(dataParseReg)].map(i => i[1]);
+				return data.length ? data : [`翻译失败, vendor: ${"AI"}`];
 			})
 			.catch(error => Promise.reject(error));
 	}
